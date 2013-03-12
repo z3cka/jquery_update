@@ -95,6 +95,7 @@ function jquery_update_library_alter(&$javascript, $module) {
     else {
       // By default ignore the admin pages and convert the string to lowercase.
       $pages = drupal_strtolower(variable_get('jquery_update_pages', "admin\nadmin/*"));
+      $pages_hard_exceptions = drupal_strtolower(variable_get('jquery_update_pages_hard_exceptions', "admin/structure/pages/*"));
 
       // Get the alias of the current page and also convert it to lowercase.
       $path = drupal_strtolower(drupal_get_path_alias($_GET['q']));
@@ -107,12 +108,18 @@ function jquery_update_library_alter(&$javascript, $module) {
         $page_match = drupal_match_path($_GET['q'], $pages);
       }
 
+      // Hard exception matching
+      $hard_exception_match = drupal_match_path($path, $pages_hard_exceptions);
+      if (!$hard_exception_match && $path != $_GET['q']) {
+        $hard_exception_match = drupal_match_path($_GET['q'], $pages_hard_exceptions);
+      }
+
       // XOR the visibility setting vs whether the path matched.
       $page_match = !($visibility xor $page_match);
     }
 
     // If there's a positive path match, load the alternative jQuery.
-    if ($page_match) {
+    if ($page_match && !$hard_exception_match) {
       $version = $admin_version;
     }
   }
@@ -225,6 +232,20 @@ function jquery_update_settings_form() {
     '#title' => t('Pages'),
     '#default_value' => variable_get('jquery_update_pages', "admin\nadmin/*"),
     '#description' => t("Specify pages by using their paths. Enter one path per line. The '*' character is a wildcard. Example paths are %blog for the blog page and %blog-wildcard for every personal blog. %front is the front page.", array('%blog' => 'blog', '%blog-wildcard' => 'blog/*', '%front' => '<front>')),
+
+    // Use the states API to hide this optional field if the 'switch' option is
+    // set to 'admin'.
+    '#states' => array(
+      'invisible' => array(
+        ':input[name="jquery_update_visibility"]' => array('value' => JQUERY_UPDATE_VISIBILITY_ADMIN),
+      ),
+    ),
+  );
+  $form['version_options']['pages_wrapper']['jquery_update_pages_hard_exceptions'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Pages'),
+    '#default_value' => variable_get('jquery_update_pages_hard_exceptions', "admin/structure/pages/*"),
+    '#description' => t("Specify paths to <em>ALWAYS</em> exclude."),
 
     // Use the states API to hide this optional field if the 'switch' option is
     // set to 'admin'.
